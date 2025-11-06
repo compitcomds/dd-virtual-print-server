@@ -3,7 +3,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import PlainTextResponse, JSONResponse, FileResponse
 from src.utils import get_ps_path
 from src.process_ps_files_loop import process_ps_files_loop
-from db import init_db, get_file_record, update_status, add_file_record
+from db import init_db, get_file_record, update_file_record, add_file_record
 
 app = FastAPI()
 
@@ -35,28 +35,32 @@ def download_pdf(file_id: str, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=404, detail="File id not found")
 
     pdf_path = record["pdf_path"]
+    ps_path = record["ps_path"]
     status = record["status"]
+    certificate_id = record["certificate_id"]
+    log_message = record["log_message"]
 
     if status == "downloaded":
         raise HTTPException(status_code=400, detail="The file is already downloaded.")
 
-    if os.path.exists(pdf_path):
-        background_tasks.add_task(remove_file, file_id, pdf_path)
+    if certificate_id and os.path.exists(pdf_path):
+        background_tasks.add_task(remove_file, file_id, ps_path, pdf_path)
         return FileResponse(
             pdf_path,
             media_type="application/pdf",
-            filename=os.path.basename(pdf_path),
+            filename=f"{certificate_id}.pdf",
             background=background_tasks
         )
 
     if status == "failed":
-        raise HTTPException(status_code=400, detail="The extraction for the file failed.")
+        raise HTTPException(status_code=400, detail=log_message or "The extraction for the file failed.")
     
     return {"status": status, "message": "The file will start processing soon." if status == "uploaded" else "The file is in processing"}
 
-def remove_file(file_id: str, pdf_path: str):
-    update_status(file_id, "downloaded")
+def remove_file(file_id: str, ps_path: str, pdf_path: str):
+    update_file_record(file_id, status="downloaded")
     os.remove(pdf_path)
+    os.remove(ps_path)
 
 def store_ps_file(file_id, content):
     path = get_ps_path(file_id, make_ps_folder=True)

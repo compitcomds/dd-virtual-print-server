@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 from typing import Literal, TypedDict, Optional
 
-FileStatus = Literal["uploaded", "converted", "processing", "failed", "success", "downloaded"]
+FileStatus = Literal["uploaded", "converted", "failed", "success", "downloaded"]
 
 DB_PATH = "ocr.db"
 
@@ -24,7 +24,7 @@ def init_db():
             file_id TEXT PRIMARY KEY,
             ps_path TEXT NOT NULL,
             pdf_path TEXT,
-            status TEXT NOT NULL CHECK (status IN ('uploaded', 'converted', 'processing', 'failed', 'success', 'downloaded')),
+            status TEXT NOT NULL CHECK (status IN ('uploaded', 'converted', 'failed', 'success', 'downloaded')),
             created_at TEXT NOT NULL,
             certificate_id TEXT,
             log_message TEXT,
@@ -41,24 +41,6 @@ def add_file_record(file_id: str, ps_path: str):
         INSERT INTO files (file_id, ps_path, pdf_path, status, created_at, certificate_id, log_message, retry)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (file_id, ps_path, None, "uploaded", datetime.now().isoformat(), None, None, 0))
-    conn.commit()
-    conn.close()
-
-def update_status(file_id: str, status: FileStatus):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        UPDATE files SET status = ? WHERE file_id = ?
-    """, (status, file_id))
-    conn.commit()
-    conn.close()
-
-def update_pdf_path(file_id: str, pdf_path: str):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        UPDATE files SET pdf_path = ? WHERE file_id = ?
-    """, (pdf_path, file_id))
     conn.commit()
     conn.close()
 
@@ -130,21 +112,11 @@ def get_next_processing_record() -> Optional[FileRecord]:
     c.execute("""
         SELECT *
         FROM files
-        WHERE (status = 'uploaded' OR status = 'converted') AND retry < 3
+        WHERE (status = 'uploaded' OR status = 'converted') AND retry < 4
         ORDER BY datetime(created_at) ASC
         LIMIT 1
     """)
-    row = c.fetchone()
-    
-    if row:
-        file_id = row['file_id']
-        c.execute("""
-            UPDATE files SET retry = retry + 1 WHERE file_id = ?
-        """, (file_id,))
-        conn.commit()
-        result = dict(row)
-    else:
-        result = None
-    
+    row = c.fetchone()    
+    result = dict(row) if row else None
     conn.close()
     return result
