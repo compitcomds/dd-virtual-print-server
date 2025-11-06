@@ -1,6 +1,5 @@
 import os, subprocess
 import shutil
-from .utils import get_ps_path, get_pdf_path
 
 gs_paths = [
     "gswin64c",
@@ -18,9 +17,8 @@ for gs_path in gs_paths:
 if not gs_cmd:
     raise FileNotFoundError("Ghostscript not found in PATH")
 
-def convert_ps_to_pdf(file_id):
+def convert_ps_to_pdf(ps_file: str, pdf_file: str):
     try:
-        ps_file = get_ps_path(file_id)
         print(f"Conversion for ps<{os.path.basename(ps_file)}> -> pdf<{os.path.basename(pdf_file)}>")
 
         if not os.path.exists(ps_file):
@@ -30,8 +28,6 @@ def convert_ps_to_pdf(file_id):
         if not gs_cmd:
             print("Ghostscript not found", "error")
             return False, "Ghostscript not found"
-
-        pdf_file = get_pdf_path(file_id, make_pdf_folder=True)
         
         cmd = [
             gs_cmd,
