@@ -4,6 +4,7 @@ from fastapi.responses import PlainTextResponse, JSONResponse, FileResponse
 from src.utils import get_ps_path
 from src.process_ps_files_loop import process_ps_files_loop
 from db import init_db, get_file_record, update_file_record, add_file_record
+import hashlib
 
 app = FastAPI()
 
@@ -55,7 +56,7 @@ def download_pdf(file_id: str, background_tasks: BackgroundTasks):
     if status == "failed":
         raise HTTPException(status_code=400, detail=log_message or "The extraction for the file failed.")
     
-    return {"status": status, "message": "The file will start processing soon." if status == "uploaded" else "The file is in processing"}
+    return JSONResponse({"status": status, "message": "The file will start processing soon." if status == "uploaded" else "The file is in processing"}, status_code=201)
 
 def remove_file(file_id: str, ps_path: str, pdf_path: str):
     update_file_record(file_id, status="downloaded")
@@ -66,4 +67,6 @@ def store_ps_file(file_id, content):
     path = get_ps_path(file_id, make_ps_folder=True)
     with open(path, "wb") as f:
         f.write(content)
+    
+    print("Uploaded hash:", hashlib.md5(content).hexdigest())
     return path
